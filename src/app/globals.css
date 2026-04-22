@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/* ──────────────────────────────────────────────────────────
+   Custom Properties
+────────────────────────────────────────────────────────── */
+:root {
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* ──────────────────────────────────────────────────────────
+   Base Reset
+────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ──────────────────────────────────────────────────────────
+   Skeleton Shimmer Animation
+────────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #1f1f1f 0%,
+    #2a2a2a 40%,
+    #333333 50%,
+    #2a2a2a 60%,
+    #1f1f1f 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* ──────────────────────────────────────────────────────────
+   Parallax: CSS scroll-driven animation (where supported).
+   Falls back gracefully — card images simply don't move.
+────────────────────────────────────────────────────────── */
+@supports (animation-timeline: scroll()) {
+  .parallax-image {
+    animation: parallax-shift linear both;
+    animation-timeline: scroll();
+    animation-range: entry 0% exit 100%;
+    will-change: transform;
+  }
+
+  @keyframes parallax-shift {
+    0%   { transform: translateY(-12px); }
+    100% { transform: translateY(12px); }
+  }
+}
+
+/* ──────────────────────────────────────────────────────────
+   Focus styles
+────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 2px;
+}
+
+/* ──────────────────────────────────────────────────────────
+   Custom scrollbar (Webkit)
+────────────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 6px; }
+::-webkit-scrollbar-track  { background: #0a0a0a; }
+::-webkit-scrollbar-thumb  { background: #2a2a2a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
