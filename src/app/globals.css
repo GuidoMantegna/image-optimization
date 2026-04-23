@@ -84,3 +84,14 @@ html {
 ::-webkit-scrollbar-track  { background: #0a0a0a; }
 ::-webkit-scrollbar-thumb  { background: #2a2a2a; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+
+/* ──────────────────────────────────────────────────────────
+   Scrollbar hide utility (used by FilterBar)
+────────────────────────────────────────────────────────── */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

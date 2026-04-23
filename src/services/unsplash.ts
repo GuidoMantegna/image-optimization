@@ -1,4 +1,4 @@
-import { UnsplashPhoto } from "@/types/unsplash";
+import { UnsplashPhoto, PhotoFilters } from "@/types/unsplash";
 
 export interface FetchPhotosResult {
   photos: UnsplashPhoto[];
@@ -6,21 +6,34 @@ export interface FetchPhotosResult {
   rateLimitRemaining: number | null;
 }
 
-/**
- * Fetches a page of photos through our internal API proxy.
- * The proxy keeps UNSPLASH_ACCESS_KEY server-side.
- */
+/** Routes to the search endpoint when color/orientation/relevant-sort are active. */
+export async function fetchFilteredPhotos(
+  page: number,
+  perPage: number = 20,
+  filters?: PhotoFilters
+): Promise<FetchPhotosResult> {
+  const needsSearch = !!(
+    filters?.color ||
+    filters?.orientation ||
+    filters?.order_by === "relevant"
+  );
+  return needsSearch
+    ? fetchSearchPhotos(page, perPage, filters)
+    : fetchPhotos(page, perPage, filters?.order_by);
+}
+
 export async function fetchPhotos(
   page: number,
-  perPage: number = 20
+  perPage: number = 20,
+  orderBy?: string
 ): Promise<FetchPhotosResult> {
   const params = new URLSearchParams({
     page: String(page),
     per_page: String(perPage),
   });
+  if (orderBy && orderBy !== "relevant") params.set("order_by", orderBy);
 
   const res = await fetch(`/api/photos?${params}`, {
-    // Let the browser use its HTTP cache for the API response (60s)
     next: { revalidate: 60 },
   });
 
@@ -31,8 +44,35 @@ export async function fetchPhotos(
 
   const photos: UnsplashPhoto[] = await res.json();
   const rateLimitRemaining = Number(res.headers.get("X-Ratelimit-Remaining")) || null;
+  const nextPage = photos.length === perPage ? page + 1 : null;
 
-  // Unsplash returns empty array on the last page, so signal no more pages
+  return { photos, nextPage, rateLimitRemaining };
+}
+
+async function fetchSearchPhotos(
+  page: number,
+  perPage: number = 20,
+  filters?: PhotoFilters
+): Promise<FetchPhotosResult> {
+  const params = new URLSearchParams({
+    page: String(page),
+    per_page: String(perPage),
+  });
+  if (filters?.color) params.set("color", filters.color);
+  if (filters?.orientation) params.set("orientation", filters.orientation);
+  if (filters?.order_by) params.set("order_by", filters.order_by);
+
+  const res = await fetch(`/api/search/photos?${params}`, {
+    next: { revalidate: 60 },
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(error.error ?? `HTTP ${res.status}`);
+  }
+
+  const photos: UnsplashPhoto[] = await res.json();
+  const rateLimitRemaining = Number(res.headers.get("X-Ratelimit-Remaining")) || null;
   const nextPage = photos.length === perPage ? page + 1 : null;
 
   return { photos, nextPage, rateLimitRemaining };

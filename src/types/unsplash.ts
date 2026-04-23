@@ -53,3 +53,25 @@ export interface SearchCollectionsResult {
   total: number;
   total_pages: number;
 }
+
+export type PhotoColor =
+  | "black_and_white"
+  | "black"
+  | "white"
+  | "yellow"
+  | "orange"
+  | "red"
+  | "purple"
+  | "magenta"
+  | "green"
+  | "teal"
+  | "blue";
+
+export type PhotoOrientation = "landscape" | "portrait" | "squarish";
+export type PhotoOrderBy = "latest" | "relevant";
+
+export interface PhotoFilters {
+  color?: PhotoColor;
+  orientation?: PhotoOrientation;
+  order_by?: PhotoOrderBy;
+}
