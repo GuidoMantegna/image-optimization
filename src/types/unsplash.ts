@@ -37,3 +37,19 @@ export interface UnsplashPhoto {
     country: string | null;
   };
 }
+
+export interface UnsplashCollection {
+  id: string;
+  title: string;
+  description: string | null;
+  total_photos: number;
+  cover_photo: UnsplashPhoto | null;
+  preview_photos: Array<{ urls: { thumb: string } }> | null;
+  user: UnsplashUser;
+}
+
+export interface SearchCollectionsResult {
+  results: UnsplashCollection[];
+  total: number;
+  total_pages: number;
+}
