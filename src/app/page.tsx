@@ -1,24 +1,57 @@
 "use client";
 
-import { useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import ImageGrid from "@/components/ImageGrid";
 import InfiniteScrollTrigger from "@/components/InfiniteScrollTrigger";
 import Lightbox from "@/components/Lightbox";
+import { SearchBar } from "@/components/SearchBar";
 import { useImages } from "@/hooks/useImages";
+import { useCollectionPhotos } from "@/hooks/useCollectionPhotos";
 import { useLightbox } from "@/hooks/useLightbox";
+import { UnsplashCollection } from "@/types/unsplash";
 
 export default function HomePage() {
-  const {
-    images,
-    isLoading,
-    isError,
-    error,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
-    refetch,
-  } = useImages();
+  const router = useRouter();
+  const [selectedCollection, setSelectedCollection] = useState<UnsplashCollection | null>(null);
+
+  // Restore collection from URL on mount (client-only, avoids useSearchParams Suspense requirement)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("collection");
+    const title = params.get("ctitle");
+    if (id && title) {
+      setSelectedCollection({
+        id,
+        title,
+        description: null,
+        total_photos: 0,
+        cover_photo: null,
+        preview_photos: null,
+        user: {} as UnsplashCollection["user"],
+      });
+    }
+  }, []);
+
+  // Keep URL in sync when collection changes
+  useEffect(() => {
+    if (selectedCollection) {
+      const params = new URLSearchParams();
+      params.set("collection", selectedCollection.id);
+      params.set("ctitle", selectedCollection.title);
+      router.replace(`/?${params.toString()}`, { scroll: false });
+    } else {
+      router.replace("/", { scroll: false });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCollection?.id]);
+
+  const defaultFeed = useImages();
+  const collectionFeed = useCollectionPhotos(selectedCollection?.id ?? null);
+
+  const feed = selectedCollection ? collectionFeed : defaultFeed;
+  const { images, isLoading, isError, error, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } = feed;
 
   const { selectedPhoto, isOpen, open, close, next, prev } = useLightbox(images);
 
@@ -26,12 +59,48 @@ export default function HomePage() {
     fetchNextPage();
   }, [fetchNextPage]);
 
+  const handleSelectCollection = useCallback((collection: UnsplashCollection) => {
+    setSelectedCollection(collection);
+  }, []);
+
+  const handleClear = useCallback(() => {
+    setSelectedCollection(null);
+  }, []);
+
   return (
     <main className="min-h-screen pb-8">
       <Header />
 
       {/* Push content below fixed header */}
       <div className="pt-14">
+
+        {/* Search bar */}
+        <div className="px-4 md:px-6 max-w-screen-xl mx-auto pt-6 pb-2">
+          <SearchBar
+            onSelectCollection={handleSelectCollection}
+            onClear={handleClear}
+            activeCollectionTitle={selectedCollection?.title}
+          />
+
+          {/* Active collection badge */}
+          {selectedCollection && selectedCollection.total_photos > 0 && (
+            <div className="mt-3 flex items-center gap-2 text-sm">
+              <span className="text-neutral-400">
+                Collection:{" "}
+                <span className="text-white font-medium">{selectedCollection.title}</span>
+                <span className="text-neutral-500">
+                  {" "}· {selectedCollection.total_photos.toLocaleString()} photos
+                </span>
+              </span>
+              <button
+                onClick={handleClear}
+                className="ml-auto text-neutral-500 hover:text-white transition-colors text-xs"
+              >
+                Browse all ×
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Error state */}
         {isError && (
@@ -67,16 +136,30 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Empty state (key configured but returns nothing) */}
+        {/* Empty state */}
         {!isLoading && !isError && images.length === 0 && (
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-            <p className="text-neutral-500 text-lg">No photos found.</p>
-            <p className="text-neutral-600 text-sm mt-1">
-              Check your Unsplash API key in{" "}
-              <code className="bg-neutral-800 px-1.5 py-0.5 rounded text-xs">
-                .env.local
-              </code>
-            </p>
+            {selectedCollection ? (
+              <>
+                <p className="text-neutral-500 text-lg">This collection has no photos.</p>
+                <button
+                  onClick={handleClear}
+                  className="mt-4 text-sm text-neutral-400 hover:text-white transition-colors"
+                >
+                  Browse all photos →
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-neutral-500 text-lg">No photos found.</p>
+                <p className="text-neutral-600 text-sm mt-1">
+                  Check your Unsplash API key in{" "}
+                  <code className="bg-neutral-800 px-1.5 py-0.5 rounded text-xs">
+                    .env.local
+                  </code>
+                </p>
+              </>
+            )}
           </div>
         )}
 
