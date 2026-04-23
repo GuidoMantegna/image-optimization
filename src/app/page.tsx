@@ -7,18 +7,34 @@ import ImageGrid from "@/components/ImageGrid";
 import InfiniteScrollTrigger from "@/components/InfiniteScrollTrigger";
 import Lightbox from "@/components/Lightbox";
 import { SearchBar } from "@/components/SearchBar";
+import { FilterBar } from "@/components/FilterBar";
 import { useImages } from "@/hooks/useImages";
 import { useCollectionPhotos } from "@/hooks/useCollectionPhotos";
 import { useLightbox } from "@/hooks/useLightbox";
-import { UnsplashCollection } from "@/types/unsplash";
+import {
+  UnsplashCollection,
+  PhotoFilters,
+  PhotoColor,
+  PhotoOrientation,
+  PhotoOrderBy,
+} from "@/types/unsplash";
+
+const VALID_COLORS = new Set<string>([
+  "black_and_white", "black", "white", "yellow", "orange",
+  "red", "purple", "magenta", "green", "teal", "blue",
+]);
+const VALID_ORIENTATIONS = new Set<string>(["landscape", "portrait", "squarish"]);
+const VALID_ORDER_BY = new Set<string>(["latest", "relevant"]);
 
 export default function HomePage() {
   const router = useRouter();
   const [selectedCollection, setSelectedCollection] = useState<UnsplashCollection | null>(null);
+  const [filters, setFilters] = useState<PhotoFilters>({});
 
-  // Restore collection from URL on mount (client-only, avoids useSearchParams Suspense requirement)
+  // Restore collection and filters from URL on mount (client-only)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
     const id = params.get("collection");
     const title = params.get("ctitle");
     if (id && title) {
@@ -32,22 +48,33 @@ export default function HomePage() {
         user: {} as UnsplashCollection["user"],
       });
     }
+
+    const color = params.get("color");
+    const orientation = params.get("orientation");
+    const order_by = params.get("order_by");
+    const restoredFilters: PhotoFilters = {};
+    if (color && VALID_COLORS.has(color)) restoredFilters.color = color as PhotoColor;
+    if (orientation && VALID_ORIENTATIONS.has(orientation)) restoredFilters.orientation = orientation as PhotoOrientation;
+    if (order_by && VALID_ORDER_BY.has(order_by)) restoredFilters.order_by = order_by as PhotoOrderBy;
+    if (Object.keys(restoredFilters).length > 0) setFilters(restoredFilters);
   }, []);
 
-  // Keep URL in sync when collection changes
+  // Keep URL in sync whenever collection or filters change
   useEffect(() => {
+    const params = new URLSearchParams();
     if (selectedCollection) {
-      const params = new URLSearchParams();
       params.set("collection", selectedCollection.id);
       params.set("ctitle", selectedCollection.title);
-      router.replace(`/?${params.toString()}`, { scroll: false });
-    } else {
-      router.replace("/", { scroll: false });
     }
+    if (filters.color)       params.set("color", filters.color);
+    if (filters.orientation) params.set("orientation", filters.orientation);
+    if (filters.order_by)    params.set("order_by", filters.order_by);
+    const search = params.toString();
+    router.replace(search ? `/?${search}` : "/", { scroll: false });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCollection?.id]);
+  }, [selectedCollection?.id, filters.color, filters.orientation, filters.order_by]);
 
-  const defaultFeed = useImages();
+  const defaultFeed = useImages(filters);
   const collectionFeed = useCollectionPhotos(selectedCollection?.id ?? null);
 
   const feed = selectedCollection ? collectionFeed : defaultFeed;
@@ -74,7 +101,7 @@ export default function HomePage() {
       {/* Push content below fixed header */}
       <div className="pt-14">
 
-        {/* Search bar */}
+        {/* Search + filter area */}
         <div className="px-4 md:px-6 max-w-screen-xl mx-auto pt-6 pb-2">
           <SearchBar
             onSelectCollection={handleSelectCollection}
@@ -82,9 +109,14 @@ export default function HomePage() {
             activeCollectionTitle={selectedCollection?.title}
           />
 
+          {/* Filter bar */}
+          <div className="mt-3">
+            <FilterBar filters={filters} onChange={setFilters} />
+          </div>
+
           {/* Active collection badge */}
           {selectedCollection && selectedCollection.total_photos > 0 && (
-            <div className="mt-3 flex items-center gap-2 text-sm">
+            <div className="mt-2 flex items-center gap-2 text-sm">
               <span className="text-neutral-400">
                 Collection:{" "}
                 <span className="text-white font-medium">{selectedCollection.title}</span>
@@ -153,7 +185,7 @@ export default function HomePage() {
               <>
                 <p className="text-neutral-500 text-lg">No photos found.</p>
                 <p className="text-neutral-600 text-sm mt-1">
-                  Check your Unsplash API key in{" "}
+                  Try different filters or check your Unsplash API key in{" "}
                   <code className="bg-neutral-800 px-1.5 py-0.5 rounded text-xs">
                     .env.local
                   </code>
