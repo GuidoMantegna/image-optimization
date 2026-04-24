@@ -26,3 +26,29 @@
 - `FilterBar` uses `aria-pressed` toggles; `role="group"` per filter category
 - `Lightbox` renders via React Portal to `document.body` to avoid z-index stacking issues
 - Debounce: 350 ms on collection search input (see `useDebounce.ts`)
+
+## Testing
+
+**Stack:** Vitest 3 · React Testing Library 16 · user-event 14 · MSW 2 · jsdom
+
+**Run tests:**
+```bash
+npm test              # one-shot
+npm run test:watch    # watch mode
+npm run test:coverage # with coverage report
+```
+
+**Structure** (`src/__tests__/`):
+- `setup.ts` — jest-dom matchers, MSW lifecycle, `MockIntersectionObserver` with `simulateIntersection()` helper
+- `utils/renderWithProviders.tsx` — `renderWithProviders` / `renderHookWithProviders` wrapping a fresh `QueryClient` (retry:false, gcTime:0)
+- `utils/factories.ts` — `createMockPhoto`, `createMockCollection`, `createMockUser`, batch variants
+- `mocks/handlers.ts` — MSW handlers for `/api/search/photos` and `/api/collections/search`
+- `hooks/` — unit tests for `useCollectionSearch`, `useIntersectionObserver`, `useSearchPhotos`
+- `components/` — behavior tests for `FilterBar`, `SearchBar`, `page.tsx`
+
+**Key conventions:**
+- MSW handlers use `http://localhost/api/...` (jsdom resolves relative URLs against `http://localhost`)
+- `useDebounce` is mocked to identity in `SearchBar.test.tsx` — debounce timing is tested at the hook level
+- `IntersectionObserver` is mocked globally in setup; call `getLastIntersectionObserver().simulateIntersection(true)` in tests that need it
+- Mock `next/navigation` at module scope with `vi.mock(...)` in any file that renders components using `useRouter`
+- Each test gets a fresh `QueryClient` via `renderWithProviders`; override `server.use(...)` per-test for non-default MSW responses
