@@ -1,4 +1,5 @@
-import { UnsplashPhoto, PhotoFilters } from "@/types/unsplash";
+import { UnsplashPhoto } from "@/types/unsplash";
+import { DEFAULT_PER_PAGE, DEFAULT_QUERY, REVALIDATE_SECONDS } from "@/lib/constants";
 
 export interface FetchPhotosResult {
   photos: UnsplashPhoto[];
@@ -6,64 +7,37 @@ export interface FetchPhotosResult {
   rateLimitRemaining: number | null;
 }
 
-/** Routes to the search endpoint when color/orientation/relevant-sort are active. */
-export async function fetchFilteredPhotos(
-  page: number,
-  perPage: number = 20,
-  filters?: PhotoFilters
-): Promise<FetchPhotosResult> {
-  const needsSearch = !!(
-    filters?.color ||
-    filters?.orientation ||
-    filters?.order_by === "relevant"
-  );
-  return needsSearch
-    ? fetchSearchPhotos(page, perPage, filters)
-    : fetchPhotos(page, perPage, filters?.order_by);
+export interface SearchPhotosParams {
+  query?: string;
+  collectionId?: string;
+  color?: string;
+  orientation?: string;
+  orderBy?: string;
+  page?: number;
+  perPage?: number;
 }
 
-export async function fetchPhotos(
-  page: number,
-  perPage: number = 20,
-  orderBy?: string
-): Promise<FetchPhotosResult> {
+export async function searchPhotos({
+  query,
+  collectionId,
+  color,
+  orientation,
+  orderBy,
+  page = 1,
+  perPage = DEFAULT_PER_PAGE,
+}: SearchPhotosParams): Promise<FetchPhotosResult> {
   const params = new URLSearchParams({
     page: String(page),
     per_page: String(perPage),
   });
-  if (orderBy && orderBy !== "relevant") params.set("order_by", orderBy);
-
-  const res = await fetch(`/api/photos?${params}`, {
-    next: { revalidate: 60 },
-  });
-
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error ?? `HTTP ${res.status}`);
-  }
-
-  const photos: UnsplashPhoto[] = await res.json();
-  const rateLimitRemaining = Number(res.headers.get("X-Ratelimit-Remaining")) || null;
-  const nextPage = photos.length === perPage ? page + 1 : null;
-
-  return { photos, nextPage, rateLimitRemaining };
-}
-
-async function fetchSearchPhotos(
-  page: number,
-  perPage: number = 20,
-  filters?: PhotoFilters
-): Promise<FetchPhotosResult> {
-  const params = new URLSearchParams({
-    page: String(page),
-    per_page: String(perPage),
-  });
-  if (filters?.color) params.set("color", filters.color);
-  if (filters?.orientation) params.set("orientation", filters.orientation);
-  if (filters?.order_by) params.set("order_by", filters.order_by);
+  if (query) params.set("query", query);
+  if (collectionId) params.set("collections", collectionId);
+  if (color) params.set("color", color);
+  if (orientation) params.set("orientation", orientation);
+  if (orderBy) params.set("order_by", orderBy);
 
   const res = await fetch(`/api/search/photos?${params}`, {
-    next: { revalidate: 60 },
+    next: { revalidate: REVALIDATE_SECONDS },
   });
 
   if (!res.ok) {
@@ -78,10 +52,6 @@ async function fetchSearchPhotos(
   return { photos, nextPage, rateLimitRemaining };
 }
 
-/**
- * Build an Unsplash CDN URL with explicit optimisation params.
- * Using raw URL gives full control over dimensions, format, and quality.
- */
 export function buildImageUrl(
   rawUrl: string,
   width: number,
@@ -93,11 +63,10 @@ export function buildImageUrl(
   url.searchParams.set("q", String(quality));
   url.searchParams.set("fm", format);
   url.searchParams.set("fit", "crop");
-  url.searchParams.set("auto", "format"); // Unsplash fallback format negotiation
+  url.searchParams.set("auto", "format");
   return url.toString();
 }
 
-/** Returns a tiny placeholder URL (20px wide, low quality) for blur-up effect */
 export function buildPlaceholderUrl(rawUrl: string): string {
   return buildImageUrl(rawUrl, 20, 10, "webp");
 }

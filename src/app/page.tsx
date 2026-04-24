@@ -1,16 +1,18 @@
 "use client";
 
+// HOOKS
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useLightbox } from "@/hooks/useLightbox";
+import { useSearchPhotos } from "@/hooks/useSearchPhotos";
+// UI
 import Header from "@/components/Header";
 import ImageGrid from "@/components/ImageGrid";
 import InfiniteScrollTrigger from "@/components/InfiniteScrollTrigger";
 import Lightbox from "@/components/Lightbox";
 import { SearchBar } from "@/components/SearchBar";
 import { FilterBar } from "@/components/FilterBar";
-import { useImages } from "@/hooks/useImages";
-import { useCollectionPhotos } from "@/hooks/useCollectionPhotos";
-import { useLightbox } from "@/hooks/useLightbox";
+// TYPES
 import {
   UnsplashCollection,
   PhotoFilters,
@@ -18,13 +20,10 @@ import {
   PhotoOrientation,
   PhotoOrderBy,
 } from "@/types/unsplash";
+// LIB
+import { VALID_COLORS, VALID_ORIENTATIONS, VALID_ORDER_BY } from "@/lib/constants";
 
-const VALID_COLORS = new Set<string>([
-  "black_and_white", "black", "white", "yellow", "orange",
-  "red", "purple", "magenta", "green", "teal", "blue",
-]);
-const VALID_ORIENTATIONS = new Set<string>(["landscape", "portrait", "squarish"]);
-const VALID_ORDER_BY = new Set<string>(["latest", "relevant"]);
+
 
 export default function HomePage() {
   const router = useRouter();
@@ -66,19 +65,16 @@ export default function HomePage() {
       params.set("collection", selectedCollection.id);
       params.set("ctitle", selectedCollection.title);
     }
-    if (filters.color)       params.set("color", filters.color);
+    if (filters.color) params.set("color", filters.color);
     if (filters.orientation) params.set("orientation", filters.orientation);
-    if (filters.order_by)    params.set("order_by", filters.order_by);
+    if (filters.order_by) params.set("order_by", filters.order_by);
     const search = params.toString();
     router.replace(search ? `/?${search}` : "/", { scroll: false });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCollection?.id, filters.color, filters.orientation, filters.order_by]);
 
-  const defaultFeed = useImages(filters);
-  const collectionFeed = useCollectionPhotos(selectedCollection?.id ?? null);
-
-  const feed = selectedCollection ? collectionFeed : defaultFeed;
-  const { images, isLoading, isError, error, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } = feed;
+  const { images, isLoading, isError, error, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } =
+    useSearchPhotos({ collectionId: selectedCollection?.id, filters });
 
   const { selectedPhoto, isOpen, open, close, next, prev } = useLightbox(images);
 

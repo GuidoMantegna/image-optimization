@@ -1,65 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
+import { UNSPLASH_BASE, DEFAULT_QUERY, REVALIDATE_SECONDS } from "@/lib/constants";
+import {
+  requireAccessKey,
+  clampPerPage,
+  pickRateLimitHeaders,
+  proxyError,
+} from "@/lib/unsplash-route-utils";
 
-const UNSPLASH_BASE = "https://api.unsplash.com";
+const VALID_ORDER_BY = new Set(["relevant", "latest"]);
 
 export async function GET(request: NextRequest) {
-  const accessKey = process.env.UNSPLASH_ACCESS_KEY;
-
-  if (!accessKey) {
-    return NextResponse.json(
-      { error: "Unsplash API key not configured. Set UNSPLASH_ACCESS_KEY in .env.local" },
-      { status: 500 }
-    );
-  }
+  const accessKey = requireAccessKey();
+  if (accessKey instanceof NextResponse) return accessKey;
 
   const { searchParams } = request.nextUrl;
+  const query = searchParams.get("query") || DEFAULT_QUERY;
   const page = searchParams.get("page") ?? "1";
-  const perPage = searchParams.get("per_page") ?? "20";
+  const perPage = clampPerPage(searchParams.get("per_page"));
   const color = searchParams.get("color");
   const orientation = searchParams.get("orientation");
   const orderBy = searchParams.get("order_by") ?? "relevant";
+  const collections = searchParams.get("collections");
 
-  const clampedPerPage = Math.min(Math.max(Number(perPage), 1), 30);
-  const safeOrderBy = (["relevant", "latest"] as string[]).includes(orderBy)
-    ? orderBy
-    : "relevant";
-
-  // Unsplash search requires a query — use broad fallback when no user-supplied term
-  const query = searchParams.get("query") || "photography";
+  const safeOrderBy = VALID_ORDER_BY.has(orderBy) ? orderBy : "relevant";
 
   const apiUrl = new URL(`${UNSPLASH_BASE}/search/photos`);
   apiUrl.searchParams.set("query", query);
   apiUrl.searchParams.set("page", page);
-  apiUrl.searchParams.set("per_page", String(clampedPerPage));
+  apiUrl.searchParams.set("per_page", String(perPage));
   apiUrl.searchParams.set("order_by", safeOrderBy);
   if (color) apiUrl.searchParams.set("color", color);
   if (orientation) apiUrl.searchParams.set("orientation", orientation);
+  if (collections) apiUrl.searchParams.set("collections", collections);
 
   const res = await fetch(apiUrl.toString(), {
     headers: {
       Authorization: `Client-ID ${accessKey}`,
       "Accept-Version": "v1",
     },
-    next: { revalidate: 60 },
+    next: { revalidate: REVALIDATE_SECONDS },
   });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    console.error("[Unsplash Search API Error]", res.status, body);
-    return NextResponse.json(
-      { error: `Unsplash API error: ${res.status}` },
-      { status: res.status }
-    );
-  }
+  if (!res.ok) return proxyError(res, "Unsplash Search Photos");
 
-  // Search endpoint returns { results: [], total: N, total_pages: N }
   const data = await res.json();
-
-  const headers = new Headers();
-  const rl = res.headers.get("X-Ratelimit-Remaining");
-  const rlLimit = res.headers.get("X-Ratelimit-Limit");
-  if (rl) headers.set("X-Ratelimit-Remaining", rl);
-  if (rlLimit) headers.set("X-Ratelimit-Limit", rlLimit);
-
-  return NextResponse.json(data.results ?? [], { headers });
+  return NextResponse.json(data.results ?? [], { headers: pickRateLimitHeaders(res) });
 }
