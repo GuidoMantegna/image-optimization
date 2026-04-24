@@ -1,31 +1,41 @@
 "use client";
 
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { fetchFilteredPhotos } from "@/services/unsplash";
+import { searchPhotos } from "@/services/unsplash";
 import { UnsplashPhoto, PhotoFilters } from "@/types/unsplash";
+import { DEFAULT_PER_PAGE } from "@/lib/constants";
 import { useMemo } from "react";
 
-const PER_PAGE = 20;
+export interface SearchPhotosOptions {
+  collectionId?: string | null;
+  filters?: PhotoFilters;
+}
 
-export function useImages(filters?: PhotoFilters) {
+export function useSearchPhotos({ collectionId, filters }: SearchPhotosOptions) {
   const query = useInfiniteQuery({
     queryKey: [
-      "photos",
+      "search-photos",
       {
+        collectionId: collectionId ?? null,
         color: filters?.color ?? null,
         orientation: filters?.orientation ?? null,
         order_by: filters?.order_by ?? null,
       },
     ],
     queryFn: ({ pageParam }) =>
-      fetchFilteredPhotos(pageParam as number, PER_PAGE, filters),
+      searchPhotos({
+        collectionId: collectionId ?? undefined,
+        color: filters?.color,
+        orientation: filters?.orientation,
+        orderBy: filters?.order_by,
+        page: pageParam as number,
+        perPage: DEFAULT_PER_PAGE,
+      }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => lastPage.nextPage,
-    // Keep previous data visible while fetching next page — prevents flash
     placeholderData: (prev) => prev,
   });
 
-  // Flatten pages into a single array, memoized to avoid recreating on every render
   const images: UnsplashPhoto[] = useMemo(
     () => query.data?.pages.flatMap((page) => page.photos) ?? [],
     [query.data]
