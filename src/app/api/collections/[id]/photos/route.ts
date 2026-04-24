@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
+/**
+ * Route responsibility:
+ * Proxies `GET /api/collections/[id]/photos` to Unsplash collection photos.
+ *
+ * Developer and agent notes:
+ * - Requires `UNSPLASH_ACCESS_KEY` in environment.
+ * - Accepts `page` and `per_page` query params, with `per_page` clamped to 1..30.
+ * - Forwards Unsplash rate-limit remaining as `X-Ratelimit-Remaining`.
+ * - Returns upstream error status when Unsplash fails.
+ */
 const UNSPLASH_BASE = "https://api.unsplash.com";
 
 export async function GET(
@@ -20,6 +30,7 @@ export async function GET(
   const page = searchParams.get("page") ?? "1";
   const perPage = searchParams.get("per_page") ?? "20";
 
+  // Ensures `per_page` stays within Unsplash limits (min 1, max 30).
   const clampedPerPage = Math.min(Math.max(Number(perPage), 1), 30);
 
   const apiUrl = new URL(`${UNSPLASH_BASE}/collections/${id}/photos`);
