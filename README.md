@@ -1,6 +1,16 @@
 # LensFeed — Infinite Photo Gallery
 
-A production-ready infinite-scroll image gallery powered by the Unsplash API, built with Next.js 15 App Router, TanStack Query, and Tailwind CSS.
+A production-ready infinite-scroll image gallery powered by the Unsplash API, built with Next.js 16 App Router, React 19, TanStack Query v5, and Tailwind CSS v4.
+
+## Features
+
+- **Infinite scroll** — loads 20 photos at a time via Intersection Observer
+- **Search** — free-text photo search with live collection suggestions (debounced, accessible combobox)
+- **Filters** — color, orientation, and sort-order filters with URL sync (shareable links)
+- **Lightbox** — full-resolution modal with keyboard navigation (←/→/Esc)
+- **Blur-up placeholders** — low-quality image placeholders that fade out on load
+- **Shimmer skeletons** — CSS-animated placeholders shown while fetching
+- **Parallax** — CSS scroll-driven animation on cards
 
 ## Setup
 
@@ -22,7 +32,7 @@ Open `.env.local` and paste your key:
 UNSPLASH_ACCESS_KEY=your_access_key_here
 ```
 
-> The key is only used server-side (in the Next.js API route) and never exposed to the client.
+> The key is used server-side only (Next.js API routes) and is never exposed to the client.
 
 ### 3. Install dependencies & run
 
@@ -40,28 +50,38 @@ Open [http://localhost:3000](http://localhost:3000).
 ```
 src/
 ├── app/
-│   ├── api/photos/route.ts        # Server-side Unsplash proxy (keeps key secret)
-│   ├── layout.tsx                 # Root layout + QueryClientProvider
-│   ├── page.tsx                   # Home page — wires all hooks & components
-│   ├── providers.tsx              # TanStack Query client provider
-│   └── globals.css                # Tailwind + shimmer animation + parallax
+│   ├── api/
+│   │   ├── search/photos/route.ts         # Photo search proxy → Unsplash /search/photos
+│   │   └── collections/search/route.ts    # Collection search proxy → Unsplash /search/collections
+│   ├── layout.tsx                         # Root layout + Geist font + metadata
+│   ├── page.tsx                           # Home page — search, filters, infinite grid
+│   ├── providers.tsx                      # TanStack Query client provider + devtools
+│   └── globals.css                        # Tailwind v4 + shimmer + parallax + dropdown
 ├── components/
-│   ├── Header.tsx                 # Fixed glassmorphism header
-│   ├── ImageCard.tsx              # Card: blur-up placeholder, srcset, hover overlay
-│   ├── ImageGrid.tsx              # CSS-columns masonry grid
-│   ├── ImageSkeleton.tsx          # Shimmer skeleton placeholders
-│   ├── InfiniteScrollTrigger.tsx  # Intersection Observer sentinel
-│   └── Lightbox.tsx               # Portal modal with keyboard navigation
+│   ├── FilterBar.tsx                      # Color / orientation / sort toggles (WAI-ARIA)
+│   ├── Header.tsx                         # Fixed glassmorphism header
+│   ├── ImageCard.tsx                      # Card: blur-up placeholder, srcset, hover overlay
+│   ├── ImageGrid.tsx                      # CSS-columns masonry grid
+│   ├── ImageSkeleton.tsx                  # Shimmer skeleton placeholders
+│   ├── InfiniteScrollTrigger.tsx          # Intersection Observer sentinel
+│   ├── Lightbox.tsx                       # Portal modal with keyboard navigation
+│   ├── SearchBar.tsx                      # Accessible combobox with collection suggestions
+│   └── SearchSuggestions.tsx              # Collection search dropdown listbox
 ├── hooks/
-│   ├── useImages.ts               # useInfiniteQuery — infinite scroll data
-│   ├── useIntersectionObserver.ts # Reusable IO hook
-│   └── useLightbox.ts             # Lightbox open/close/prev/next state
+│   ├── useCollectionSearch.ts             # Collection search (useQuery, 2 min stale)
+│   ├── useDebounce.ts                     # Generic value debounce hook
+│   ├── useIntersectionObserver.ts         # Reusable IntersectionObserver hook
+│   ├── useLightbox.ts                     # Lightbox open/close/prev/next + keyboard
+│   └── useSearchPhotos.ts                 # useInfiniteQuery — photo search + pagination
 ├── services/
-│   └── unsplash.ts                # fetch abstraction + CDN URL builder
+│   ├── collections.ts                     # searchCollections() fetch abstraction
+│   └── unsplash.ts                        # searchPhotos() + CDN URL builder
 ├── types/
-│   └── unsplash.ts                # UnsplashPhoto TypeScript interfaces
+│   └── unsplash.ts                        # UnsplashPhoto, UnsplashCollection, filter types
 └── lib/
-    └── queryClient.ts             # Singleton QueryClient (5 min stale, 10 min gc)
+    ├── constants.ts                       # Shared constants (base URL, defaults, valid values)
+    ├── queryClient.ts                     # Singleton QueryClient (5 min stale, 10 min gc)
+    └── unsplash-route-utils.ts            # Shared route helpers (auth, clamping, errors)
 ```
 
 ## Performance Features
@@ -73,11 +93,13 @@ src/
 | Lazy loading | `loading="lazy"` on all subsequent images |
 | Modern formats | Unsplash CDN `?fm=webp` on all image URLs |
 | Responsive images | `srcset` at 400w / 800w / 1200w with `sizes` |
-| Blur-up placeholder | 20px thumbnail blurred, fades out on full image load |
+| Blur-up placeholder | 20 px / 10 % quality thumbnail blurred, fades out on full image load |
 | Request deduplication | TanStack Query caches by page key, stale for 5 minutes |
-| No unnecessary re-renders | `memo()` on `ImageGrid`, `ImageCard`, `Header` |
-| Infinite scroll | `IntersectionObserver` sentinel 300px before viewport edge |
+| No unnecessary re-renders | `memo()` on `ImageGrid`, `ImageCard`, `Header`, `FilterBar` |
+| Infinite scroll | `IntersectionObserver` sentinel 300 px before viewport edge |
 | Parallax | CSS scroll-driven animation (`animation-timeline: scroll()`) |
+| Debounced search | 350 ms debounce on collection search input |
+| Shareable filters | Active filters and collection synced to URL query params |
 
 ## Rate Limits
 
